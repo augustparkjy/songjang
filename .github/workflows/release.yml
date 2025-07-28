@@ -38,20 +38,28 @@ jobs:
     - name: Create release package
       run: |
         cd dist
-        zip -r ../엑셀통합프로그램_${GITHUB_REF_NAME}.zip 엑셀통합프로그램 엑셀통합프로그램_앱.app
+        # 파일 크기 확인
+        ls -la
+        # 더 작은 압축 파일 생성
+        zip -r ../엑셀통합프로그램_${GITHUB_REF_NAME}.zip 엑셀통합프로그램
+        # 앱 번들은 별도로 압축
+        zip -r ../엑셀통합프로그램_앱_${GITHUB_REF_NAME}.zip 엑셀통합프로그램_앱.app
         cd ..
+        # 파일 크기 확인
+        ls -la *.zip
         
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
         files: |
           엑셀통합프로그램_${{ github.ref_name }}.zip
+          엑셀통합프로그램_앱_${{ github.ref_name }}.zip
         body: |
           ## 엑셀 통합 프로그램 v${{ github.ref_name }}
           
           ### 다운로드
-          - **단일 실행 파일**: `엑셀통합프로그램` (터미널에서 실행)
-          - **macOS 앱**: `엑셀통합프로그램_앱.app` (더블클릭으로 실행)
+          - **단일 실행 파일**: `엑셀통합프로그램_${{ github.ref_name }}.zip` (터미널에서 실행)
+          - **macOS 앱**: `엑셀통합프로그램_앱_${{ github.ref_name }}.zip` (더블클릭으로 실행)
           
           ### 사용법
           1. 압축 파일을 다운로드하고 압축 해제
