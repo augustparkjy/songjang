@@ -35,6 +35,15 @@ jobs:
         uv run pyinstaller --onefile --name "엑셀통합프로그램" excel_merger.py
         uv run pyinstaller --onedir --windowed --name "엑셀통합프로그램_앱" excel_merger.py
         
+    - name: Remove code signing attributes
+      run: |
+        cd dist
+        # 단일 실행 파일에서 코드 서명 제거
+        xattr -cr 엑셀통합프로그램/엑셀통합프로그램
+        # 앱 번들에서 코드 서명 제거
+        xattr -cr 엑셀통합프로그램_앱.app/Contents/MacOS/엑셀통합프로그램_앱
+        cd ..
+        
     - name: Create release package
       run: |
         cd dist

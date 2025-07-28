@@ -42,6 +42,16 @@ chmod +x 엑셀통합프로그램
    sudo xattr -rd com.apple.quarantine /path/to/엑셀통합프로그램.app
    ```
 
+#### "손상된 파일" 오류
+압축 해제 후 실행 파일이 손상되었다고 나오는 경우:
+```bash
+# 단일 실행 파일의 경우
+xattr -cr /path/to/엑셀통합프로그램
+
+# 앱 번들의 경우
+xattr -cr /path/to/엑셀통합프로그램.app/Contents/MacOS/엑셀통합프로그램
+```
+
 #### 앱이 실행되지 않는 경우
 1. 터미널에서 실행하여 오류 메시지 확인
 2. Python 환경이 올바르게 설정되어 있는지 확인
