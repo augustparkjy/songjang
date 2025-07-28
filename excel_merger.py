@@ -248,29 +248,31 @@ class ExcelMergerApp:
             if category == "구운란":
                 self._process_egg_files()
             else:
-                self._process_rice_files(category)
+                self._process_rice_files()
                     
         except Exception as e:
             # 오류 메시지 표시 (메인 스레드에서)
+            print(e)
             self.root.after(0, lambda: messagebox.showerror("오류", f"파일 통합 중 오류가 발생했습니다: {str(e)}"))
     
     def _process_egg_files(self):
         """구운란 파일들을 처리합니다."""
         items = []
         
-        # 업로드된 파일들만 처리
-        platform_files = {
-            'coupang': self.uploaded_files["구운란"]["쿠팡"],
-            'alwayz': self.uploaded_files["구운란"]["올웨이즈"],
-            'toss': self.uploaded_files["구운란"]["토스"]
-        }
+        platform_files = {}
+        if self.uploaded_files['구운란'].get('쿠팡', None) is not None:
+            platform_files['coupang'] = self.uploaded_files['구운란']['쿠팡']
+        if self.uploaded_files['구운란'].get('올웨이즈', None) is not None:
+            platform_files['alwayz'] = self.uploaded_files['구운란']['올웨이즈']
+        if self.uploaded_files['구운란'].get('토스', None) is not None:
+            platform_files['toss'] = self.uploaded_files['구운란']['토스']
         
         for platform, file_path in platform_files.items():
             print(platform, file_path)
             if file_path is not None:
                 try:
                     df = pd.read_excel(file_path)
-                    extracted_items = self.extract_data(df, platform)
+                    extracted_items = self.extract_data(df, platform, 'egg')
                     items.extend(extracted_items)
                 except Exception as e:
                     print(e)
@@ -282,72 +284,154 @@ class ExcelMergerApp:
         else:
             self.root.after(0, lambda: messagebox.showwarning("경고", "처리할 데이터가 없습니다."))
     
-    def extract_data(self, df, platform):
+    def extract_data(self, df, platform, product_type):
         """데이터를 추출하여 Item 객체들을 반환합니다."""
         # Product['egg'][platform]이 리스트인지 확인하고 필터링
-        filtered_df = df[df[Format['product_id'][platform]].isin(Product['egg'][platform])]
+
+        filtered_df = df[df[Format['product_id'][platform]].isin(Product[product_type][platform])]
         
         # 그룹화된 데이터로 Item 객체들 생성
         items = []
-        for _, row in filtered_df.iterrows():
-            receiver = row[Format['receiver'][platform]]
-            contact = row[Format['contact'][platform]]
-            address = row[Format['address'][platform]]
-            message = row[Format['message'][platform]]
-            count = row[Format['count'][platform]]
+        if product_type == 'egg':
+            for _, row in filtered_df.iterrows():
+                receiver = row[Format['receiver'][platform]]
+                contact = row[Format['contact'][platform]]
+                address = row[Format['address'][platform]]
+                message = row[Format['message'][platform]]
+                count = row[Format['count'][platform]]
+                
+                if platform == 'coupang':
+                    product_name = row[Format['product_name'][platform]].split()[1]
+                    quantity = int(row[Format['options'][platform]].split()[1][:2]) * row[Format['count'][platform]]
+                elif platform == 'alwayz':
+                    split_options = row[Format['options'][platform]].split('\n')
+                    product_name = split_options[0].split()[2]
+                    quantity = int(split_options[1].split()[2][:2]) * row[Format['count'][platform]]
+                    contact_str = str(row[Format['contact'][platform]])
+                    contact = f'0{contact_str[:-8]}-{contact_str[-8:-4]}-{contact_str[-4:]}'
+                elif platform == 'toss':
+                    product_name = row[Format['product_name'][platform]].split()[-1].split('(')[0]
+                    quantity = int(row[Format['options'][platform]].split(',')[0][:2]) * row[Format['count'][platform]]
+                    contact_str = str(row[Format['contact'][platform]])
+                    contact = f'0{contact_str[:-8]}-{contact_str[-8:-4]}-{contact_str[-4:]}'
+                
+                if quantity > 120:
+                    _quantity = quantity
+                    while _quantity > 0:
+                        if _quantity > 120:
+                            item = Item(
+                                receiver=receiver,
+                                contact=contact,
+                                address=address,
+                                quantity=f'{product_name} 120구',
+                                note=message,
+                                shipping_number=Shipping[platform],
+                            )
+                            items.append(item)
+                            _quantity -= 120
+                        else:
+                            item = Item(
+                                receiver=receiver,
+                                contact=contact,
+                                address=address,
+                                quantity=f'{product_name} {_quantity}구',
+                                note=message,
+                                shipping_number=Shipping[platform],
+                            )
+                            items.append(item)
+                            break
+                else:
+                    item = Item(
+                        receiver=receiver,
+                        contact=contact,
+                        address=address,
+                        quantity=f'{product_name} {quantity}구',
+                        note=message,
+                        shipping_number=Shipping[platform],
+                    )
+                    items.append(item)
             
-            if platform == 'coupang':
-                product_name = row[Format['product_name'][platform]].split()[1]
-                quantity = int(row[Format['options'][platform]].split()[1][:2]) * row[Format['count'][platform]]
-            elif platform == 'alwayz':
-                split_options = row[Format['options'][platform]].split('\n')
-                product_name = split_options[0].split()[2]
-                quantity = int(split_options[1].split()[2][:2]) * row[Format['count'][platform]]
-                contact_str = str(row[Format['contact'][platform]])
-                contact = f'0{contact_str[:-8]}-{contact_str[-8:-4]}-{contact_str[-4:]}'
-            elif platform == 'toss':
-                product_name = row[Format['product_name'][platform]].split()[-1].split('(')[0]
-                quantity = int(row[Format['options'][platform]].split(',')[0][:2]) * row[Format['count'][platform]]
-                contact_str = str(row[Format['contact'][platform]])
-                contact = f'0{contact_str[:-8]}-{contact_str[-8:-4]}-{contact_str[-4:]}'
-            
-            if quantity > 120:
-                _quantity = quantity
-                while _quantity > 0:
-                    if _quantity > 120:
-                        item = Item(
-                            receiver=receiver,
-                            contact=contact,
-                            address=address,
-                            quantity=f'{product_name} 120구',
-                            note=message,
-                            shipping_number=Shipping[platform],
-                        )
-                        items.append(item)
-                        _quantity -= 120
+            return items
+        elif product_type == 'rice':
+            for _, row in filtered_df.iterrows():
+                receiver = row[Format['receiver'][platform]]
+                contact = row[Format['contact'][platform]]
+                address = row[Format['address'][platform]]
+                message = row[Format['message'][platform]]
+                count = row[Format['count'][platform]]
+                unit = 'kg'
+                
+                if platform == 'naver':
+                    product_name = row[Format['product_name'][platform]].split()[1]
+                    quantity = int(row[Format['options'][platform]].split()[1][:2]) * row[Format['count'][platform]]
+                elif platform == 'alwayz':
+                    if row[Format['product_code'][platform]] == '백미':
+                        product_name = '백미팝(150g)'
+                        quantity = 5 * row[Format['count'][platform]]
+                        unit = '개'
+                    elif row[Format['product_code'][platform]] == '신4':
+                        product_name = '신동진'
+                        quantity = 4 * row[Format['count'][platform]]
+                        unit = 'kg'
+                    elif row[Format['product_code'][platform]] == '신10':
+                        product_name = '신동진'
+                        quantity = 10 * row[Format['count'][platform]]
+                        unit = 'kg'
+                    contact_str = str(row[Format['contact'][platform]])
+                    contact = f'0{contact_str[:-8]}-{contact_str[-8:-4]}-{contact_str[-4:]}'
+
+                if unit == 'kg':
+                    if quantity > 20:
+                        _quantity = quantity
+                        while _quantity > 0:
+                            if _quantity > 20:
+                                item = Item(
+                                    receiver=receiver,
+                                    contact=contact,
+                                    address=address,
+                                    quantity=f'20{unit}',
+                                    note=message,
+                                    shipping_number=Shipping[platform],
+                                )
+                                items.append(item)
+                                _quantity -= 20
+                            else:
+                                item = Item(
+                                    receiver=receiver,
+                                    contact=contact,
+                                    address=address,
+                                    quantity=f'{_quantity}{unit}',
+                                    note=message,
+                                    shipping_number=Shipping[platform],
+                                )
+                                items.append(item)
+                                break
                     else:
                         item = Item(
-                            receiver=receiver,
-                            contact=contact,
-                            address=address,
-                            quantity=f'{product_name} {_quantity}구',
-                            note=message,
-                            shipping_number=Shipping[platform],
-                        )
-                        items.append(item)
-                        break
-            else:
-                item = Item(
-                    receiver=receiver,
-                    contact=contact,
-                    address=address,
-                    quantity=f'{product_name} {quantity}구',
-                    note=message,
-                    shipping_number=Shipping[platform],
-                )
-                items.append(item)
+                        receiver=receiver,
+                        contact=contact,
+                        address=address,
+                        quantity=f'{quantity}{unit}',
+                        note=message,
+                        shipping_number=Shipping[platform],
+                    )
+                    items.append(item)
+                    
+                else:
+                    item = Item(
+                        receiver=receiver,
+                        contact=contact,
+                        address=address,
+                        quantity=f'{product_name} {quantity}{unit}',
+                        note=message,
+                        shipping_number=Shipping[platform],
+                    )
+                    items.append(item)
+            
+            return items
+            
+
         
-        return items
     
     def export_excel(self, items):
         """Item 객체들을 엑셀 파일로 저장합니다."""
@@ -442,69 +526,33 @@ class ExcelMergerApp:
         # UI 업데이트 (메인 스레드에서)
         self.root.after(0, lambda: messagebox.showinfo("완료", f"파일이 성공적으로 생성되었습니다.\n파일명: {output_filename}"))
     
-    def _process_rice_files(self, category):
+    def _process_rice_files(self):
         """쌀 파일들을 처리합니다."""
-        merged_data = []
-        
-        for company, file_path in self.uploaded_files[category].items():
-            if file_path is None:
-                continue
-            
-            # 엑셀 파일 읽기
-            df = pd.read_excel(file_path)
-            
-            # 설정에서 매핑 정보 가져오기
-            mapping = self.config.get(category, {}).get(company, {})
-            
-            # 컬럼 매핑 적용
-            mapped_df = self.map_columns(df, mapping, company)
-            merged_data.append(mapped_df)
-        
-        if merged_data:
-            # 모든 데이터 통합
-            final_df = pd.concat(merged_data, ignore_index=True)
-            
-            # 저장할 파일명 생성
-            output_filename = f"통합_{category}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-            output_path = filedialog.asksaveasfilename(
-                title="통합 파일 저장",
-                defaultextension=".xlsx",
-                initialvalue=output_filename,
-                filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
-            )
-            
-            if output_path:
-                # 엑셀 파일로 저장
-                final_df.to_excel(output_path, index=False)
-                
-                # UI 업데이트 (메인 스레드에서)
-                self.root.after(0, lambda: messagebox.showinfo("완료", f"파일이 성공적으로 통합되었습니다.\n저장 위치: {output_path}"))
-    
-    def map_columns(self, df, mapping, company):
-        """컬럼을 매핑합니다."""
-        # 표준 컬럼명으로 변경
-        standard_columns = {
-            'product_name': '상품명',
-            'quantity': '수량', 
-            'price': '가격',
-            'date': '날짜',
-            'customer': '고객명'
-        }
-        
-        # 매핑된 컬럼으로 데이터 추출
-        mapped_data = {}
-        for standard_col, excel_col in mapping.items():
-            if excel_col in df.columns:
-                mapped_data[standard_columns[standard_col]] = df[excel_col]
-            else:
-                # 컬럼이 없으면 빈 값으로 채움
-                mapped_data[standard_columns[standard_col]] = [''] * len(df)
-        
-        # 업체 정보 추가
-        mapped_data['업체'] = [company] * len(df)
-        
-        return pd.DataFrame(mapped_data)
+        items = []
 
+        platform_files = {}
+        if self.uploaded_files['쌀'].get('네이버', None) is not None:
+            platform_files['coupang'] = self.uploaded_files['쌀']['네이버']
+        if self.uploaded_files['쌀'].get('올웨이즈', None) is not None:
+            platform_files['alwayz'] = self.uploaded_files['쌀']['올웨이즈']
+        
+        for platform, file_path in platform_files.items():
+            if file_path is not None:
+                try:
+                    df = pd.read_excel(file_path)
+                    extracted_items = self.extract_data(df, platform, 'rice')
+                    items.extend(extracted_items)
+                except Exception as e:
+                    print(e)
+                    # self.root.after(0, lambda: messagebox.showerror("오류", f"{platform} 파일 처리 중 오류: {str(e)}"))
+                    return
+        
+        if items:
+            self.export_excel(items)
+        else:
+            self.root.after(0, lambda: messagebox.showwarning("경고", "처리할 데이터가 없습니다."))
+    
+    
 def main():
     root = tk.Tk()
     app = ExcelMergerApp(root)

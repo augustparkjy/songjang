@@ -4,6 +4,10 @@ Product = {
         'coupang': [8643526485],
         'alwayz': ['66c5f527b550787272789fa2'],
         'toss': [26662045, 9300515]
+    },
+    'rice': {
+        # 6491027744e70ba232b4fbac : 곡물 팝
+        'alwayz': ['6446a65f36b5f4ba2e85b08d', '6491027744e70ba232b4fbac']
     }
 }
 
@@ -24,6 +28,9 @@ Format = {
         'coupang': '등록상품명',
         'alwayz': '상품명',
         'toss': '상품명'
+    },
+    'product_code': {
+        'alwayz': '판매자 상품코드'
     },
     'options': {
         'coupang': '등록옵션명',
