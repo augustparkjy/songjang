@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-latest
@@ -67,5 +70,6 @@ jobs:
           - 포커스 양식 엑셀 파일 생성
         draft: false
         prerelease: false
+        permissions: write
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
